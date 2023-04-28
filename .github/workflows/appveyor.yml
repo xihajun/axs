@@ -2,6 +2,9 @@ name: CI
 
 on: [push, pull_request]
 
+env:
+  ASSERT_URL: https://raw.github.com/lehmannro/assert.sh/master/assert.sh
+
 jobs:
   build:
     strategy:
@@ -10,95 +13,109 @@ jobs:
           - job_name: Windows classification Py=3.10
             os: windows-latest
             python-version: 3.10
-            env:
-              ONNX_CLASSIFY: 'on'
-              PYTORCH_CLASSIFY: 'on'
-              TF_CLASSIFY: 'on'
+            ONNX_CLASSIFY: on
+            PYTORCH_CLASSIFY: on
+            TF_CLASSIFY: on
 
           - job_name: Windows detection+Bert Py=3.10
             os: windows-latest
             python-version: 3.10
-            env:
-              ONNX_DETECTION: 'on'
-              ONNX_BERT_SQUAD: 'on'
-              PYTORCH_BERT_DEMO: 'on'
+            ONNX_DETECTION: on
+            ONNX_BERT_SQUAD: on
+            PYTORCH_BERT_DEMO: on
 
           - job_name: MacOS Bert
-            os: macOS-catalina
-            python-version: 3.9
-            env:
-              ONNX_BERT_SQUAD: 'on'
-              PYTORCH_BERT_DEMO: 'on'
+            os: macos-latest
+            ONNX_BERT_SQUAD: on
+            PYTORCH_BERT_DEMO: on
 
           - job_name: MacOS detection
-            os: macOS-catalina
-            python-version: 3.9
-            env:
-              ONNX_DETECTION: 'on'
+            os: macos-latest
+            ONNX_DETECTION: on
 
           - job_name: MacOS compile+classification
-            os: macOS-catalina
-            python-version: 3.9
-            env:
-              PACKAGE_INSTALL_AND_IMPORT: 'on'
-              C_COMPILE_AND_RUN: 'on'
-              ONNX_CLASSIFY: 'on'
+            os: macos-latest
+            PACKAGE_INSTALL_AND_IMPORT: on
+            C_COMPILE_AND_RUN: on
+            ONNX_CLASSIFY: on
 
           - job_name: Linux detection+Bert
             os: ubuntu-latest
-            python-version: 3.9
-            env:
-              ONNX_DETECTION: 'on'
-              ONNX_BERT_SQUAD: 'on'
-              PYTORCH_BERT_DEMO: 'on'
+            ONNX_DETECTION: on
+            ONNX_BERT_SQUAD: on
+            PYTORCH_BERT_DEMO: on
 
           - job_name: Linux compile+classification
             os: ubuntu-latest
-            python-version: 3.9
-            env:
-              PACKAGE_INSTALL_AND_IMPORT: 'on'
-              C_COMPILE_AND_RUN: 'on'
-              ONNX_CLASSIFY: 'on'
-              PYTORCH_CLASSIFY: 'on'
-              TF_CLASSIFY: 'on'
+            PACKAGE_INSTALL_AND_IMPORT: on
+            C_COMPILE_AND_RUN: on
+            ONNX_CLASSIFY: on
+            PYTORCH_CLASSIFY: on
+            TF_CLASSIFY: on
 
           - job_name: Windows Bert Py=3.6
             os: windows-latest
             python-version: 3.6
-            env:
-              ONNX_BERT_SQUAD: 'on'
-              PYTORCH_BERT_DEMO: 'on'
+            ONNX_BERT_SQUAD: on
+            PYTORCH_BERT_DEMO: on
 
           - job_name: Windows detection Py=3.6
             os: windows-latest
             python-version: 3.6
-            env:
-              ONNX_DETECTION: 'on'
+            ONNX_DETECTION: on
 
           - job_name: Windows classification Py=3.6
             os: windows-latest
             python-version: 3.6
-            env:
-              PACKAGE_INSTALL_AND_IMPORT: 'on'
-              ONNX_CLASSIFY: 'on'
-              PYTORCH_CLASSIFY: 'on'
+            PACKAGE_INSTALL_AND_IMPORT: on
+            ONNX_CLASSIFY: on
+            PYTORCH_CLASSIFY: on
 
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.job_name }}
-
-    env:
-      ASSERT_URL: https://raw.github.com/lehmannro/assert.sh/master/assert.sh
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
 
       - name: Set up Python ${{ matrix.python-version }}
+        if: matrix.python-version
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Initialize environment
-        if: matrix.os == 'windows-latest'
+      - name: Initialize
         run: |
-          reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            reg add "HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\FileSystem" /v LongPathsEnabled /t REG_DWORD /d 1 /f
+            echo "PYTHON_EXE=python3" | Out-File -Append -FilePath $env:GITHUB_ENV
+            echo "PATH=${{ env.PYTHON_DIR }};${{ env.PYTHON_DIR }}\\Scripts;$pwd;$env:PATH" | Out-File -Append -FilePath $env:GITHUB_ENV
+          fi
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            echo "$GITHUB_WORKSPACE" | tee -a $GITHUB_ENV
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            New-Item -ItemType SymbolicLink -Path "${{ env.PYTHON_DIR }}\python3.exe" -Target "${{ env.PYTHON_DIR }}\python.exe"
+          fi
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            curl -fsSL -o get-pip.py "https://bootstrap.pypa.io/pip/3.6/get-pip.py"
+            sudo python3 get-pip.py "pip==19.3.1"
+          fi
+          python3 --version
+          python3 -m pip --version
+          curl -fsSL -o assert.sh ${{ env.ASSERT_URL }}
+
+      - name: Run tests
+        run: |
+          python3 function_access.py
+          python3 param_source.py
+          python3 runnable.py
+          python3 stored_entry.py
+          python3 kernel.py
+          python3 axs version
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            bash test_axs.sh
+          else
+            sh test_axs.sh
+          fi
