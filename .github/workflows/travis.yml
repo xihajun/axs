@@ -1,0 +1,87 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+            dist: jammy
+            env:
+              PACKAGE_INSTALL_AND_IMPORT: 'on'
+              C_COMPILE_AND_RUN: 'on'
+              PYTHON_EXE: 'python'
+
+          - os: ubuntu-latest
+            python-version: "3.11"
+            dist: jammy
+            env:
+              TF_CLASSIFY: 'on'
+              PYTHON_EXE: 'python'
+
+          - os: ubuntu-latest
+            python-version: "3.11"
+            dist: jammy
+            env:
+              PYTORCH_CLASSIFY: 'on'
+              PYTHON_EXE: 'python'
+
+          - os: ubuntu-latest
+            python-version: "3.10.8"
+            dist: jammy
+            env:
+              ONNX_CLASSIFY: 'on'
+              PYTHON_EXE: 'python'
+
+          - os: macOS-latest
+            python-version: "3.9"
+            env:
+              ONNX_CLASSIFY: 'on'
+              PACKAGE_INSTALL_AND_IMPORT: 'on'
+              C_COMPILE_AND_RUN: 'on'
+              PYTHON_EXE: 'python3'
+
+          - os: windows-latest
+            python-version: "3.9"
+            env:
+              ONNX_BERT_SQUAD: 'on'
+              PYTHON_EXE: 'python3'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          wget https://raw.github.com/lehmannro/assert.sh/master/assert.sh
+          axs byname pip , available_versions numpy --+
+          axs byname pip , available_versions pillow --+
+
+      - name: Run tests
+        run: |
+          python function_access.py
+          python param_source.py
+          python runnable.py
+          python stored_entry.py
+          python kernel.py
+          bash test_axs.sh
+        env:
+          PACKAGE_INSTALL_AND_IMPORT: ${{ matrix.env.PACKAGE_INSTALL_AND_IMPORT }}
+          C_COMPILE_AND_RUN: ${{ matrix.env.C_COMPILE_AND_RUN }}
+          ONNX_CLASSIFY: ${{ matrix.env.ONNX_CLASSIFY }}
+          PYTORCH_CLASSIFY: ${{ matrix.env.PYTORCH_CLASSIFY }}
+          TF_CLASSIFY: ${{ matrix.env.TF_CLASSIFY }}
+          PYTHON_EXE: ${{ matrix.env.PYTHON_EXE }}
