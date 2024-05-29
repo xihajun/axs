@@ -1,4 +1,4 @@
-name: CI
+name: CI travis
 
 on:
   push:
@@ -118,6 +118,7 @@ jobs:
           git --version
           wget https://raw.github.com/lehmannro/assert.sh/master/assert.sh
           python -m pip install --upgrade pip
+          git clone https://github.com/xihajun/axs.git ~/axs
           echo "export PATH='$PATH:$HOME/axs'" >> ~/.bashrc
           source ~/.bashrc
           axs byname pip , available_versions numpy --+
