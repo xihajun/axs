@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches:
-      - '**'
       - '!mlperf_**'
   pull_request:
     branches:
@@ -13,6 +12,7 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fast-finish: true
       fail-fast: false
       matrix:
         include:
@@ -83,10 +83,6 @@ jobs:
             env:
               ONNX_CLASSIFY: 'on'
               PYTHON_EXE: python
-          - os: freebsd-latest
-            python-version: '3.6'
-            env:
-              PYTHON_EXE: python
           - os: ubuntu-latest
             arch: ppc64le
             python-version: '3.6'
@@ -109,32 +105,35 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Set environment variables
+        run: |
+          echo "PACKAGE_INSTALL_AND_IMPORT=${{ matrix.env.PACKAGE_INSTALL_AND_IMPORT }}" >> $GITHUB_ENV
+          echo "C_COMPILE_AND_RUN=${{ matrix.env.C_COMPILE_AND_RUN }}" >> $GITHUB_ENV
+          echo "TF_CLASSIFY=${{ matrix.env.TF_CLASSIFY }}" >> $GITHUB_ENV
+          echo "PYTORCH_CLASSIFY=${{ matrix.env.PYTORCH_CLASSIFY }}" >> $GITHUB_ENV
+          echo "ONNX_CLASSIFY=${{ matrix.env.ONNX_CLASSIFY }}" >> $GITHUB_ENV
+          echo "PYTORCH_BERT_DEMO=${{ matrix.env.PYTORCH_BERT_DEMO }}" >> $GITHUB_ENV
+          echo "ONNX_BERT_SQUAD=${{ matrix.env.ONNX_BERT_SQUAD }}" >> $GITHUB_ENV
+          echo "ONNX_DETECTION=${{ matrix.env.ONNX_DETECTION }}" >> $GITHUB_ENV
+          echo "PYTHON_EXE=${{ matrix.env.PYTHON_EXE }}" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: |
           echo "TRAVIS_OS_NAME=${{ matrix.os }}, TRAVIS_PYTHON_VERSION=${{ matrix.python-version }}"
-          which ${{ matrix.env.PYTHON_EXE }}
-          ${{ matrix.env.PYTHON_EXE }} --version
+          which ${{ env.PYTHON_EXE }}
+          ${{ env.PYTHON_EXE }} --version
           which git
           git --version
           wget https://raw.github.com/lehmannro/assert.sh/master/assert.sh
           python -m pip install --upgrade pip
           axs byname pip , available_versions numpy --+
           axs byname pip , available_versions pillow --+
-        env:
-          PACKAGE_INSTALL_AND_IMPORT: ${{ matrix.env.PACKAGE_INSTALL_AND_IMPORT }}
-          C_COMPILE_AND_RUN: ${{ matrix.env.C_COMPILE_AND_RUN }}
-          TF_CLASSIFY: ${{ matrix.env.TF_CLASSIFY }}
-          PYTORCH_CLASSIFY: ${{ matrix.env.PYTORCH_CLASSIFY }}
-          ONNX_CLASSIFY: ${{ matrix.env.ONNX_CLASSIFY }}
-          PYTORCH_BERT_DEMO: ${{ matrix.env.PYTORCH_BERT_DEMO }}
-          ONNX_BERT_SQUAD: ${{ matrix.env.ONNX_BERT_SQUAD }}
-          ONNX_DETECTION: ${{ matrix.env.ONNX_DETECTION }}
 
       - name: Run tests
         run: |
-          ${{ matrix.env.PYTHON_EXE }} function_access.py
-          ${{ matrix.env.PYTHON_EXE }} param_source.py
-          ${{ matrix.env.PYTHON_EXE }} runnable.py
-          ${{ matrix.env.PYTHON_EXE }} stored_entry.py
-          ${{ matrix.env.PYTHON_EXE }} kernel.py
+          ${{ env.PYTHON_EXE }} function_access.py
+          ${{ env.PYTHON_EXE }} param_source.py
+          ${{ env.PYTHON_EXE }} runnable.py
+          ${{ env.PYTHON_EXE }} stored_entry.py
+          ${{ env.PYTHON_EXE }} kernel.py
           bash test_axs.sh
