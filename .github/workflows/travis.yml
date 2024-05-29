@@ -1,6 +1,13 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - '**'
+      - '!mlperf_**'
+  pull_request:
+    branches:
+      - '**'
 
 jobs:
   build:
@@ -8,54 +15,93 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
         include:
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: '3.11'
             dist: jammy
             env:
               PACKAGE_INSTALL_AND_IMPORT: 'on'
               C_COMPILE_AND_RUN: 'on'
-              PYTHON_EXE: 'python'
-
+              PYTHON_EXE: python
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: '3.11'
             dist: jammy
             env:
               TF_CLASSIFY: 'on'
-              PYTHON_EXE: 'python'
-
+              PYTHON_EXE: python
           - os: ubuntu-latest
-            python-version: "3.11"
+            python-version: '3.11'
             dist: jammy
             env:
               PYTORCH_CLASSIFY: 'on'
-              PYTHON_EXE: 'python'
-
+              PYTHON_EXE: python
           - os: ubuntu-latest
-            python-version: "3.10.8"
+            python-version: '3.10.8'
             dist: jammy
             env:
               ONNX_CLASSIFY: 'on'
-              PYTHON_EXE: 'python'
-
-          - os: macOS-latest
-            python-version: "3.9"
+              PYTHON_EXE: python
+          - os: ubuntu-latest
+            python-version: '3.9'
+            env:
+              PYTORCH_BERT_DEMO: 'on'
+              PYTHON_EXE: python
+          - os: ubuntu-latest
+            python-version: '3.9'
+            env:
+              ONNX_BERT_SQUAD: 'on'
+              PYTHON_EXE: python
+          - os: macos-latest
+            python-version: '3.9.5'
             env:
               ONNX_CLASSIFY: 'on'
               PACKAGE_INSTALL_AND_IMPORT: 'on'
               C_COMPILE_AND_RUN: 'on'
-              PYTHON_EXE: 'python3'
-
+              PYTHON_EXE: python3
           - os: windows-latest
-            python-version: "3.9"
+            python-version: '3.9'
             env:
               ONNX_BERT_SQUAD: 'on'
-              PYTHON_EXE: 'python3'
+              PYTHON_EXE: python
+          - os: ubuntu-latest
+            python-version: '3.8'
+            env:
+              ONNX_DETECTION: 'on'
+              PYTHON_EXE: python
+          - os: ubuntu-latest
+            python-version: '3.8'
+            env:
+              PYTORCH_CLASSIFY: 'on'
+              PYTHON_EXE: python
+          - os: ubuntu-latest
+            python-version: '3.7.15'
+            env:
+              TF_CLASSIFY: 'on'
+              PYTHON_EXE: python
+          - os: ubuntu-latest
+            python-version: '3.6'
+            env:
+              ONNX_CLASSIFY: 'on'
+              PYTHON_EXE: python
+          - os: freebsd-latest
+            python-version: '3.6'
+            env:
+              PYTHON_EXE: python
+          - os: ubuntu-latest
+            arch: ppc64le
+            python-version: '3.6'
+            env:
+              PYTHON_EXE: python
+              C_COMPILE_AND_RUN: 'on'
+          - os: ubuntu-latest
+            arch: s390x
+            python-version: '3.6'
+            env:
+              PYTHON_EXE: python
+              C_COMPILE_AND_RUN: 'on'
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v2
 
       - name: Set up Python ${{ matrix.python-version }}
@@ -65,23 +111,30 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          echo "TRAVIS_OS_NAME=${{ matrix.os }}, TRAVIS_PYTHON_VERSION=${{ matrix.python-version }}"
+          which ${{ matrix.env.PYTHON_EXE }}
+          ${{ matrix.env.PYTHON_EXE }} --version
+          which git
+          git --version
           wget https://raw.github.com/lehmannro/assert.sh/master/assert.sh
+          python -m pip install --upgrade pip
           axs byname pip , available_versions numpy --+
           axs byname pip , available_versions pillow --+
-
-      - name: Run tests
-        run: |
-          python function_access.py
-          python param_source.py
-          python runnable.py
-          python stored_entry.py
-          python kernel.py
-          bash test_axs.sh
         env:
           PACKAGE_INSTALL_AND_IMPORT: ${{ matrix.env.PACKAGE_INSTALL_AND_IMPORT }}
           C_COMPILE_AND_RUN: ${{ matrix.env.C_COMPILE_AND_RUN }}
-          ONNX_CLASSIFY: ${{ matrix.env.ONNX_CLASSIFY }}
-          PYTORCH_CLASSIFY: ${{ matrix.env.PYTORCH_CLASSIFY }}
           TF_CLASSIFY: ${{ matrix.env.TF_CLASSIFY }}
-          PYTHON_EXE: ${{ matrix.env.PYTHON_EXE }}
+          PYTORCH_CLASSIFY: ${{ matrix.env.PYTORCH_CLASSIFY }}
+          ONNX_CLASSIFY: ${{ matrix.env.ONNX_CLASSIFY }}
+          PYTORCH_BERT_DEMO: ${{ matrix.env.PYTORCH_BERT_DEMO }}
+          ONNX_BERT_SQUAD: ${{ matrix.env.ONNX_BERT_SQUAD }}
+          ONNX_DETECTION: ${{ matrix.env.ONNX_DETECTION }}
+
+      - name: Run tests
+        run: |
+          ${{ matrix.env.PYTHON_EXE }} function_access.py
+          ${{ matrix.env.PYTHON_EXE }} param_source.py
+          ${{ matrix.env.PYTHON_EXE }} runnable.py
+          ${{ matrix.env.PYTHON_EXE }} stored_entry.py
+          ${{ matrix.env.PYTHON_EXE }} kernel.py
+          bash test_axs.sh
