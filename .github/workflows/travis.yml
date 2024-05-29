@@ -13,7 +13,6 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
-      fast-finish: true
       fail-fast: false
       matrix:
         include:
