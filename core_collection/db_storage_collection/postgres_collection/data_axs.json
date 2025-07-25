@@ -1,0 +1,25 @@
+{
+    "_parent_entries": [ [ "^", "core_collection" ] ],
+
+    "tags": [ "collection" ],
+
+    "uri": "postgresql://localhost/postgres",
+    "table_name": [ "^^", "get_name" ],
+
+    "pg_connection_obj": [ "^^", "execute", [[
+        [ "get_kernel" ],
+        [ "byquery", "python_package,package_name=psycopg2-binary", {"skip_entry_names": ["core_collection"]} ],
+        [ "use" ],
+        [],
+        [ "db_connect" ]
+    ]] ],
+    "postgres_parent_entry": [ "^", "byname", "postgres_entry" ],
+
+    "enabled": [ "^^", "case", [ [ "^^", "get", "table_name" ],
+        "postgres_collection", [["noop", false]] ], { "default_value": [["noop", true]], "execute_value": true } ],
+
+    "contained_entries": [ "^^", "case", [ [ "^^", "get", "enabled" ],
+        true, [[ "generate_contained_entries" ]],
+        false, [[ "noop", {} ]]
+    ], {"execute_value": true} ]
+}
