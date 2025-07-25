@@ -1,0 +1,21 @@
+{
+    "_parent_entries": [ [ "^", "core_collection" ] ],
+
+    "tags": [ "collection" ],
+
+    "db_path": "axs_sqlite.db",
+    "table_name": [ "^^", "get_name" ],
+
+    "sqlite_connection_obj": [ "^^", "execute", [[
+        [ "db_connect" ]
+    ]] ],
+    "sqlite_parent_entry": [ "^", "byname", "sqlite_entry" ],
+
+    "enabled": [ "^^", "case", [ [ "^^", "get", "table_name" ],
+        "sqlite_collection", [["noop", false]] ], { "default_value": [["noop", true]], "execute_value": true } ],
+
+    "contained_entries": [ "^^", "case", [ [ "^^", "get", "enabled" ],
+        true, [[ "generate_contained_entries" ]],
+        false, [[ "noop", {} ]]
+    ], {"execute_value": true} ]
+}
