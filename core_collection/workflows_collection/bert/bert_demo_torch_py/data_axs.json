@@ -1,0 +1,24 @@
+{
+    "_parent_entries": [ [ "^", "byname", "python_script" ], [ "^", "byname", "nvidia_gpu_support" ] ],
+    "_producer_rules": [
+        [ [ "bert_demo", "framework=pytorch" ], [["run"]], { "return_saved_record_entry": false } ]
+    ],
+
+    "transformers_query": ["python_package", "package_name=transformers"],
+    
+    "python_deps": [
+        [ "^^", "python_sync_pip_package", [[ "^^", "get", "torch_query" ]] ],
+        [ "^^", "python_sync_pip_package", [[ "^^", "get", "transformers_query" ]] ]
+    ],
+    "model_name": "bert-large-uncased-whole-word-masking-finetuned-squad",
+
+    "bert_data_context_path": [ "^^", "get_path", "context.txt" ],
+    "bert_data_questions_path": [ "^^", "get_path", "questions.txt" ],
+    "bert_debug": 0,
+    "framework": "pytorch",
+
+    "execution_device": "",
+    "rel_script_path": "bert_qa_demo.py",
+
+    "script_extra_params": [ "^^", "substitute", "\"#{model_name}#\" \"#{bert_data_context_path}#\" \"#{bert_data_questions_path}#\" #{bert_debug}# \"#{execution_device}#\"" ]
+}

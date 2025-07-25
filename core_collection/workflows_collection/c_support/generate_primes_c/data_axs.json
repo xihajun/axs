@@ -1,0 +1,67 @@
+{
+    "_producer_rules": [   
+        [ [ "compiled",       "generate_primes" ], [ [ "get", "compilation_pipeline" ] ] ],
+        [ [ "program_output", "generate_primes" ], [ ["get_kernel"],["byquery", "compiled,generate_primes"],["get", "execution_pipeline"] ] ]
+    ],
+    "_parent_entries": [ [ "^", "byname", "entry_creator" ] ],
+
+    "compiler_tool_entry": [ "^", "byquery", "shell_tool,can_compile_c" ],
+    "cjson_lib_entry": [ "^", "byquery", "lib,lib_name=cjson" ],
+
+    "tags": [ "source_code", "generate_primes" ],     
+    "file_name": "generate_primes.c",
+    "abs_source_path": [ "^^", "get_path" ],
+    "up_to": 12,
+
+    "output_file_name": "program_output.json",
+    "binary_name_def": [ "^^", "case", [ [ "^", "func", "platform.system"] ,
+       "Windows" , "generate_primes.exe" ],
+       { "default_value": "generate_primes"  }
+    ],
+
+    "newborn_name_template": "generate_primes_compiled_def_up_to_#{up_to}#",
+    "newborn_entry_tags": [ "compiled", "generate_primes" ],
+    "newborn_parent_names": [ "shell", "entry_creator" ],
+    "newborn_entry_param_mapping": {
+        "binary_name": "#{binary_name_def}#",
+        "abs_binary_path": ["AS^IS", "AS^IS", "^^", "get_path_from", "binary_name"],
+
+        "output_file_name": "#{output_file_name}#",
+        "abs_output_file_path": ["AS^IS", "AS^IS", "^^", "execute", [[
+            [ "get", "stored_newborn_entry" ],
+            [ "get_path_from", "output_file_name" ]
+        ]] ],
+        "up_to": "#{up_to}#",
+        "shell_cmd_with_subs": [ "AS#IS", "#{abs_binary_path}# #{up_to}# #{abs_output_file_path}#" ],
+
+        "newborn_name_template": [ "AS#IS", "primes_up_to_#{up_to}#" ],
+        "newborn_parent_names": [ "base_experiment" ],
+        "newborn_entry_tags": [ "program_output", "generate_primes" ],
+        "newborn_entry_param_mapping": {
+            "up_to": [ "AS#IS", "#{up_to}#" ],
+            "output_file_name": "#{output_file_name}#"
+        },
+
+        "collection_name": [ "AS^IS", "AS^IS", "^^", "get", [ "experiment_collection_name", [ "^^", "get", "work_collection_name" ] ] ],
+
+        "execution_pipeline": [ "AS^IS", "AS^IS", "^^", "execute", [[
+            ["run"],
+            [ ],
+            [ "get", "stored_newborn_entry" ]
+        ]] ]
+    },
+
+    "compilation_pipeline": [ "^^", "execute", [[
+        [ "get", "compiler_tool_entry" ],
+        [ "run", [], {
+            "cmd_key": "compile_to_binary",
+            "compile_infix": [ "^^", "substitute", "-I#{cjson_lib_entry.include_path}#" ],
+            "abs_binary_path": [ "^^", "dig", "stored_newborn_entry.abs_binary_path" ],
+            "abs_source_path": [ "^^", "get", "abs_source_path" ],
+            "compile_suffix": [ "^^", "dig", "cjson_lib_entry.cjson_o_path" ],
+            "capture_output": false
+        } ],
+        [ ],
+        [ "get", "stored_newborn_entry" ]
+    ]] ]
+}

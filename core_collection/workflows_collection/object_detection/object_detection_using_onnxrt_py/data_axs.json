@@ -1,0 +1,79 @@
+{
+    "_parent_entries": [ [ "^", "byname", "base_benchmark_program" ], [ "^", "byname", "nvidia_gpu_support" ] ],
+    "_producer_rules": [
+        [ [ "program_output", "task=object_detection", "framework=onnxrt" ], [["run"]], { "return_saved_record_entry": true } ]
+    ],
+
+    "python_deps": [
+        [ "^^", "python_sync_pip_package", [[ "^^", "get", "onnxruntime_query" ]] ],
+        [ "^", "byquery", "data_loader,coco_images" ]
+    ],
+
+    "model_name": "ssd_resnet34",
+    "model_query": [ "downloaded", "onnx_model", [ "^^", "substitute", "model_name=#{model_name}#" ] ],
+    "model_entry": [ "^", "byquery", [[ "^^", "get", "model_query" ]], {}, ["model_query"] ],
+    "model_path": [ "^^", "execute", [[
+        [ "get", "model_entry" ],
+        [ "get_path" ]
+    ]] ],
+    "dataset_name": [ "^^", "dig", "model_entry.dataset_name" ],
+    "model_resolution": [ "^^", "dig", "model_entry.resolution" ],
+    "model_output_scale": [ "^^", "dig", "model_entry.output_scale" ],
+
+    "model_input_layer_name": [ "^^", "dig", "model_entry.input_layer_name" ],
+    "model_output_layers_bls": [ "^^", "dig", "model_entry.output_layers_bls" ],
+    "model_skipped_classes": [ "^^", "dig", "model_entry.skipped_classes" ],
+
+    "normalize_symmetric": [ "^^", "dig", "model_entry.normalize_symmetric" ],
+    "subtract_mean_bool": [ "^^", "dig", "model_entry.subtract_mean_bool" ],
+    "given_channel_means": [ "^^", "dig", "model_entry.given_channel_means" ],
+    "given_channel_stds": [ "^^", "dig", "model_entry.given_channel_stds" ],
+
+    "preprocessed_images_query": [ "preprocessed",
+        [ "^^", "substitute", "dataset_name=#{dataset_name}#" ],
+        [ "^^", "substitute", "resolution=#{model_resolution}#" ],
+        [ "^^", "substitute", "first_n=#{num_of_images}#" ]
+    ],
+    "preprocessed_images_dir": [ "^", "execute", [[
+        [ "byquery", [[ "^^", "get", "preprocessed_images_query" ]] ],
+        [ "get_path" ]
+    ]], {}, ["preprocessed_images_query"] ],
+
+    "framework": "onnxrt",
+
+    "num_of_images": 20,
+    "max_batch_size": 1,
+    "execution_device": "",
+    "cpu_threads": 0,
+
+    "output_entry_parents": [ "AS^IS", "AS^IS", [ "^", "byname", "base_object_detection_experiment" ] ],
+    "output_entry_param_names": [
+        "num_of_images",
+        "model_resolution",
+        "model_path",
+        "preprocessed_images_dir",
+        "max_batch_size",
+        "cpu_threads",
+
+        "model_output_scale",
+        "model_input_layer_name",
+        "model_output_layers_bls",
+        "model_skipped_classes",
+        "normalize_symmetric",
+        "subtract_mean_bool",
+        "given_channel_means",
+        "given_channel_stds",
+        "supported_execution_providers",
+
+        "labels_file_path",
+        "minimal_class_id"
+      ],
+
+    "dataset_entry": [ "^", "byquery", [[ "^^", "substitute", "dataset,dataset_name=#{dataset_name}#" ]], {}, [ "dataset_name"] ],
+    "minimal_class_id": [ "^^", "dig", "dataset_entry.minimal_class_id" ],
+    "labels_file_path": [ "^^", "dig", "dataset_entry.labels_file_path"],
+
+    "errorize_output": true,
+
+    "rel_script_path": "onnx_detect.py"
+}

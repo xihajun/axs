@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import imp
+import importlib.util
 import logging
 import os
 import sys
@@ -17,7 +17,7 @@ class Entry(Runnable):
     MODULENAME_functions    = 'code_axs'     # the actual filename ends in .py
     PREFIX_gen_entryname    = 'generated_entry_'
 
-    def __init__(self, entry_path=None, parameters_path=None, module_name=None, container=None, generated_name_prefix=None, **kwargs):
+    def __init__(self, entry_path=None, parameters_path=None, module_name=None, container=None, generated_name_prefix=None, is_stored=None, **kwargs):
         "Accept setting entry_path in addition to parent's parameters"
 
         self.generated_name_prefix  = generated_name_prefix or self.PREFIX_gen_entryname
@@ -30,6 +30,7 @@ class Entry(Runnable):
 
         self.parameters_path        = parameters_path
         self.module_name            = module_name or self.MODULENAME_functions
+        self.is_stored              = is_stored if type(is_stored)==bool else os.path.exists(entry_path)
 
         super().__init__(**kwargs)
 
@@ -62,6 +63,9 @@ Usage examples :
 
         else:                                   # relative to cwd
             self.entry_path = os.path.realpath( new_path )
+
+        self.parameters_path    = None
+        self.name               = None
 
         return self
 
@@ -99,7 +103,24 @@ Usage examples :
 Usage examples :
                 axs byquery package_name=numpy , get_path_from rel_packages_dir
         """
-        return self.get_path(self.dig(key_path))
+        rel_path = self.dig(key_path)
+
+        return self.get_path(rel_path) if rel_path is not None else None
+
+
+    def get_path_of(self, resource_name, strict=True):
+        """Assuming the entry has contained_files{} dictionary defined,
+            given the resource_name maps it to the absolute path of this resource.
+            Also optionally checks if the path exists, raising FileNotFoundError if not.
+
+Usage examples :
+                axs byquery git_repo,repo_name=mlperf_inference_git , get_path_of bert_code_root
+        """
+        abs_path = self.get_path(self.dig(["contained_files", resource_name], safe=not strict))
+        if strict and not os.path.exists( abs_path ):
+            raise FileNotFoundError( abs_path )
+
+        return abs_path
 
 
     def trim_path(self, input_path):
@@ -127,12 +148,14 @@ Usage examples :
         candidates = ufun.fs_find(self.get_path(''), regex, looking_for_dir=looking_for_dir, return_full=return_full, topdown=topdown)
 
         if not abs_paths:
-            candidates = [ self.trim_path(c) for c in candidates ]
+            candidates = [ self.trim_path(c).split( os.path.sep ) for c in candidates ]     # each trimmed path is a list in our internal "portable relative path format"
 
         if return_all:
             return candidates
+        elif len(candidates):
+            return candidates[0]
         else:
-            return candidates[0].split( os.path.sep )   # still a list -- it is our internal "portable relative path format"
+            return None
 
 
     def get_name(self):
@@ -192,29 +215,14 @@ Usage examples :
         return self
 
 
-    def own_data(self, data_dict=None):
-        """Lazy-load, cache and return own data from the file system
+    def pure_data_loader(self):
+        "Returns the dictionary loaded or the (stringifiable) exception object"
 
-Usage examples :
-                axs byname base_map , own_data
-                axs byname derived_map , own_data
-        """
-
-        if data_dict is not None:
-            self.own_data_cache = data_dict
-            self.parent_objects = None  # magic request to reload the parents
-            return self
-
-        elif self.own_data_cache is None:   # lazy-loading condition
-            parameters_path = self.get_parameters_path()
-            if os.path.isfile( parameters_path ):
-                self.own_data_cache = ufun.load_json( parameters_path )
-                self.touch('_AFTER_DATA_LOADING')
-            else:
-                logging.warning(f"[{self.get_name()}] parameters file {parameters_path} did not exist, initializing to empty parameters")
-                self.own_data_cache = {}
-
-        return self.own_data_cache
+        parameters_path = self.get_parameters_path()
+        try:
+            return ufun.load_json( parameters_path )
+        except OSError as e:
+            return e
 
 
     def own_functions(self):
@@ -233,22 +241,36 @@ Usage examples :
             if entry_path:
                 module_name = self.get_module_name()
 
-                try:
-                    (open_file_descriptor, path_to_module, module_description) = imp.find_module( module_name, [entry_path] )
-                except ImportError as e:
-                    self.own_functions_cache = False
-                else:
+                file_path = os.path.join( entry_path , module_name+'.py' )
+                if os.path.exists( file_path ):
+                    spec = importlib.util.spec_from_file_location(module_name, file_path)
                     self.own_functions_cache = False    # to avoid infinite recursion
                     self.touch('_BEFORE_CODE_LOADING')
+                    self.own_functions_cache = importlib.util.module_from_spec(spec)
                     sys.path.insert( 0, entry_path )    # allow (and prefer) code imports local to the entry
-                    self.own_functions_cache = imp.load_module(path_to_module, open_file_descriptor, path_to_module, module_description) or False
+                    spec.loader.exec_module( self.own_functions_cache )
                     sys.path.pop( 0 )                   # /allow (and prefer) code imports local to the entry
+
+                else:
+                    self.own_functions_cache = False
 
             else:
                 logging.debug(f"[{self.get_name()}] The entry does not have a path, so no functions either")
                 self.own_functions_cache = False
 
         return self.own_functions_cache
+
+
+    def reload(self):
+        """Triggers reloading data, code and clears call cache.
+
+            Useful when another axs process is allowed to update entries and we need to pick up the changes.
+        """
+        self.own_data_cache         = None
+        self.call_cache             = {}
+        self.own_functions_cache    = None
+
+        return self
 
 
     def pickle_one(self):
@@ -269,7 +291,7 @@ Usage examples :
             return [ "^", "fresh_entry", [], fresh_entry_opt_args ]
 
 
-    def save(self, new_path=None):
+    def save(self, new_path=None, on_collision="force", completed=None):    # FIXME: "force" mimics old behaviour. To benefit from the change we need to switch to "raise"
         """Store [updated] own_data of the entry
             Note1: the entry didn't have to have existed prior to saving
             Note2: only parameters get stored
@@ -279,26 +301,60 @@ Usage examples :
                 axs fresh_entry , plant contained_entries '---={}' _parent_entries --,:=AS^IS:^:core_collection , save new_collection
         """
 
-        # FIXME: cache_replace() should be called even if new_path not defined, but it's the first time the entry is saved
         if new_path:
-            self.get_kernel().cache_replace(self.parameters_path or self.entry_path, new_path, self)
-
             self.set_path( new_path )
-            self.parameters_path    = None
-            self.name               = None
+            self.is_stored = False
+        else:
+            new_path = self.get_path()
 
-        parameters_full_path        = self.get_parameters_path()
+        own_data = self.own_data()
 
-        # Autovivify the directories in between if necessary:
-        parameters_dirname      = os.path.dirname( parameters_full_path )
-        if parameters_dirname and not os.path.exists(parameters_dirname):
-            os.makedirs(parameters_dirname)
+        if ("__completed" in own_data) or ("__query" in own_data) or (completed is not None):
+            self["__completed"] = completed or False
 
-        json_string = ufun.save_json( self.pickle_struct(self.own_data()), parameters_full_path, indent=4 )
+        parameters_path        = self.get_parameters_path()
+        parameters_dirname, parameters_basename = os.path.split( parameters_path )
 
-        logging.warning(f"[{self.get_name()}] parameters {json_string} saved to '{parameters_full_path}'")
+        if parameters_dirname and not self.is_stored:   # directory needs to be created
+            if os.path.exists( parameters_dirname ):    # unexpected collision
+
+                if on_collision in ("force", "ignore"):
+                    logging.warning(f"[{self.get_name()}] Saving into existing directory {parameters_dirname} in --on_collision=force mode")
+
+                elif on_collision=="timestamp":
+                    prev_parameters_dirname = parameters_dirname
+                    parameters_dirname += '_' + ufun.generate_current_timestamp(fs_safe=True)
+                    logging.warning(f"[{self.get_name()}] Collision when saving into existing directory {prev_parameters_dirname}, switching to {parameters_dirname} in --on_collision=timestamp mode")
+
+                    if self.parameters_path:
+                        parameters_path = os.path.join( parameters_dirname, parameters_basename)
+                    else:
+                        self.name       = os.path.basename(parameters_dirname)
+                        self.entry_path = None
+                        parameters_path = self.get_parameters_path()
+                        parameters_dirname, parameters_basename = os.path.split( parameters_path )
+
+                    if os.path.exists(parameters_dirname):  # still a collision?
+                        raise FileExistsError( f"Cannot save to {prev_parameters_dirname} or {parameters_dirname} as both directories exist. Please investigate or use --on_collision=force to override" )
+                    else:
+                        os.makedirs( parameters_dirname )
+
+                else: # elif on_collision=="raise":
+                    raise FileExistsError( f"Cannot save to {parameters_dirname} as the directory exists. Use --on_collision=force to override" )
+
+            else:
+                os.makedirs( parameters_dirname )
+
+        json_string = ufun.save_json( self.pickle_struct(own_data), parameters_path, indent=4 )
+
+        logging.info(f"[{self.get_name()}] parameters {json_string} saved to '{parameters_path}'")
 
         self.call('attach')
+
+        ak = self.get_kernel()
+        if ak:
+            ak.encache( new_path, self )
+        self.is_stored  = True
 
         return self
 
@@ -311,14 +367,17 @@ Usage examples :
         """
         self.call('detach')
 
-        entry_path = self.get_path('')
-        if entry_path:
+        if self.is_stored:
+            entry_path = self.parameters_path or self.entry_path
             ufun.rmdir( entry_path )
-            logging.warning(f"[{self.get_name()}] {entry_path} removed from the filesystem")
-        else:
-            logging.warning(f"[{self.get_name()}] was not saved to the file system, so cannot be removed")
+            logging.info(f"[{self.get_name()}] {entry_path} removed from the filesystem")
 
-        self.entry_path     = None
+            ak = self.get_kernel()
+            if ak:
+                ak.uncache( entry_path )
+            self.is_stored  = False
+        else:
+            logging.warning(f"[{self.get_name()}] was not stored in the file system, so cannot be removed")
 
         return self
 

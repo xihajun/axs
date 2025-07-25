@@ -3,12 +3,20 @@
 """ A simple CommandLine API for this framework.
 """
 
+import getpass
 import json
 import logging
+import os
 import re
+import socket
 import sys
 
-#logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(funcName)s %(message)s")   # put this BEFORE IMPORTING the kernel to see logging from the kernel
+log_indocker = 'inDocker:' if os.path.exists('/.dockerenv') else ''
+log_username = getpass.getuser()
+log_hostname = socket.gethostname()
+
+logging.basicConfig(level=logging.INFO, format=f"%(levelname)s:{log_indocker}{log_username}@{log_hostname} %(filename)s:%(funcName)s:%(lineno)s %(message)s")
+#logging.basicConfig(level=logging.DEBUG, format=f"%(levelname)s:{log_username}@{log_hostname} %(filename)s:%(funcName)s:%(lineno)s %(message)s") # put this BEFORE IMPORTING the kernel to see logging from the kernel
 
 from function_access import to_num_or_not_to_num
 from kernel import default_kernel as ak
@@ -56,7 +64,7 @@ def cli_parse(arglist):
         if arglist[i]==',':     # just skip the pipeline link separator
             i += 1
         elif arglist[i].startswith(','):
-            insert_position = int(arglist[i][1:])
+            insert_position = to_num_or_not_to_num(arglist[i][1:])
             pipeline.append( insert_position )
             i += 1
 
@@ -79,11 +87,11 @@ def cli_parse(arglist):
                     if re.match(r'^(\w*):(?:(\w*):)?$', arglist[i]):                # input and/or output label(s)
                         matched = re.match(r'^(\w*):(?:(\w*):)?$', arglist[i])
                         curr_link.extend( [ None, call_pos_params, call_params, matched.group(1), matched.group(2) ] )
-                    elif re.match(r'^\w+$', arglist[i]):                            # a normal action
+                    elif re.match(r'^(?:\.[\w\-]*\.)?(?:\w+\.)*\w+$', arglist[i]):                      # a normal action (qualified or local)
                         curr_link.extend( [ arglist[i], call_pos_params, call_params ] )
                     else:
                         raise(Exception("Parsing error - cannot understand non-option '{}' before an action".format(arglist[i])))
-                elif curr_link[0] is None and re.match(r'^\w+$', arglist[i]):       # a normal action after input/output label(s)
+                elif curr_link[0] is None and re.match(r'^(?:\.[\w\-]*\.)?(?:\w+\.)*\w+$', arglist[i]): # a normal action (qualified or local) after input/output label(s)
                     curr_link[0] = arglist[i]
                 else:
                     call_pos_params.append( to_num_or_not_to_num(arglist[i]) )      # a positional argument
@@ -94,12 +102,15 @@ def cli_parse(arglist):
                     call_param_json     = matched.group(6)
                     call_param_value    = json.loads( call_param_json )
                 else:
-                    matched = re.match(r'^--(([\w\.]*\+?)((\^{1,2})(\w+))?)([\ ,;:/]{0,3})=(.*)$', arglist[i])  # scalar value, list, list-of-lists or dictionary
+                    matched = re.match(r'^--(([\w\.]*\+?)((\^{1,2})(\w+))?)([\ ,;:/]{0,3})(#?)=(.*)$', arglist[i])  # scalar value, list, list-of-lists or dictionary
                     if matched:
                         delimiters          = list(matched.group(6))
-                        call_param_value    = matched.group(7)
+                        substitute_first    = matched.group(7)
+                        call_param_value    = matched.group(8)
 
-                        if len(delimiters)==3 and delimiters[1]==delimiters[2]:     # a dictionary
+                        if substitute_first:
+                            call_param_value    = [ '^^', 'substitute', call_param_value ]
+                        elif len(delimiters)==3 and delimiters[1]==delimiters[2]:     # a dictionary
                             call_param_value    = dict([ [ to_num_or_not_to_num(elem) for elem in group.split(delimiters[1]) ] for group in call_param_value.split(delimiters[0]) ])
                         elif len(delimiters)==2:                                    # a 2D list
                             call_param_value    = [ [ to_num_or_not_to_num(elem) for elem in group.split(delimiters[1]) ] for group in call_param_value.split(delimiters[0]) ]
@@ -135,7 +146,10 @@ def main():
     pipeline = cli_parse(sys.argv[1:])
 #    from pprint import pprint
 #    pprint(pipeline)
-    return ak.execute(pipeline)
+    try:
+        return ak.execute(pipeline)
+    except RuntimeError as e:
+        logging.error(f"RuntimeError: {e}")
 
 if __name__ == '__main__':
     print(ak.pickle_struct(main()))

@@ -1,0 +1,23 @@
+{
+    "_parent_entries": [ [ "^", "core_collection" ] ],
+    "tags": [
+        "collection"
+    ],
+    "contained_entries": {
+        "imagenet500_recipe": "imagenet500_recipe",
+        "imagenet_annotation_recipe": "imagenet_annotation_recipe",
+        "pillow_process_imagenet": "pillow_process_imagenet",
+        "imagenet_preprocessed_loader": "imagenet_preprocessed_loader",
+        "base_imagenet_experiment": "base_imagenet_experiment",
+
+        "image_classification_using_pytorch_py": "image_classification_using_pytorch_py",
+
+        "model_onnx_mobilenet_recipe": "model_onnx_mobilenet_recipe",
+        "model_onnx_resnet50_recipe": "model_onnx_resnet50_recipe",
+        "image_classification_using_onnxrt_py": "image_classification_using_onnxrt_py",
+
+        "model_tf_resnet50_recipe": "model_tf_resnet50_recipe",
+        "model_tf_mobilenet_v2_recipe": "model_tf_mobilenet_v2_recipe",
+        "image_classification_using_tf_py": "image_classification_using_tf_py"
+    }
+}

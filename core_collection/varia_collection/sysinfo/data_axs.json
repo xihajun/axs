@@ -1,0 +1,5 @@
+{
+    "_parent_entries": [ [ "^", "byname", "shell" ] ],
+    "osname": [ "^^", "run", "uname -s", { "capture_output": true } ],
+    "arch":   [ "^^", "run", "uname -m", { "capture_output": true } ]
+}

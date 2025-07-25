@@ -1,0 +1,83 @@
+{
+    "_producer_rules": [
+        [ [ "git_repo", "collection" ], [["clone"]], {
+            "tags": ["git_repo", "collection"],
+            "newborn_parent_names": [ "git", "core_collection" ],
+            "contained_entries": {}
+        } ]
+    ],
+
+    "_parent_entries": [ [ "^", "byname", "entry_creator" ] ],
+
+    "git_tool_entry": [ "^", "byquery", "shell_tool,can_git" ],
+
+    "patch_tool_entry": [ "^^", "case", [ [ "^^", "get", [ "abs_patch_path", null] ],
+        null, [[ "noop", null ]] ],
+        { "default_value": [["get_kernel"],["byquery", "shell_tool,can_patch"]], "execute_value": true } ],
+
+    "git_url": [ "^^", "execute", [[
+        [ "get", "git_tool_entry" ],
+        [ "run", [], {
+            "cmd_key": "origin_url",
+            "repo_path": [ "^^", "get", "repo_path" ],
+            "capture_output": true
+        } ]
+    ]] ],
+
+    "url_prefix": [ "^^", "execute", [[
+        [ "get", "git_url" ],
+        0,
+        [ "func", "os.path.dirname" ]
+    ]] ],
+
+    "repo_path": [ "^^", "get_path" ],
+
+    "current_checkout": [ "^^", "execute", [[
+        [ "get", "git_tool_entry" ],
+        [ "run", [], {
+            "cmd_key": "branch",
+            "repo_path": [ "^^", "get", "repo_path" ],
+            "capture_output": true
+        } ],
+        0,
+        [ "func", ["ufun.rematch", "^\\*.*\\s(\\S+?)\\)?$"] ]
+    ]] ],
+
+    "kernel_in_mlperf_mode": [ "^", "execute", [[
+        [ "byname", "git" ],
+        [ "get", "current_checkout" ],
+        [ "startswith", "mlperf_" ]
+    ]] ],
+
+    "checkout": [ "^^", "case", [
+        [ "^^", "get", "kernel_in_mlperf_mode" ],
+        true, [[ "get", "current_checkout" ]],
+        false, [[ "noop", null ]]
+    ], { "execute_value": true } ],
+
+
+    "repo_name": [ "^^", "url_2_repo_name" ],
+
+    "url": [ "^^", "substitute", "#{url_prefix}#/#{repo_name}#" ],
+
+    "rel_clone_dir": [ "^^", "substitute", "cloned_#{repo_name}#" ],
+    "inside_install_dir": [ "^^", "get", "rel_clone_dir" ],
+
+    "cloned_axs_data_path": [ "^^", "execute", [[
+        [ "get", "abs_result_path" ],
+        0,
+        [ "func", ["os.path.join", "data_axs.json"] ]
+    ]] ],
+
+    "checkout_part": [ "^^", "case", [ [ "^^", "get", ["checkout", ""] ], ["", false, null, "None"], [[ "noop", ""]] ],
+                                { "execute_value": true, "default_value": [["substitute", "_#{checkout}#"], 2, [ "func", [ "re.sub", "\\W", "_" ] ]] }
+                     ],
+    "patch_part":    [ "^^", "case", [ [ "^^", "get", ["patch", ""] ], ["", false, null, "None"], [[ "noop", ""]] ],
+                                { "execute_value": true, "default_value": [["substitute", "_#{patch}#"], 2, [ "func", [ "re.sub", "\\W", "_" ] ]] }
+                     ],
+
+    "newborn_entry_tags": [ "git_repo" ],
+    "newborn_parent_names": [ "git" ],
+    "newborn_name_template": "#{repo_name}##{checkout_part}##{patch_part}#",
+    "newborn_entry_param_names": [ "repo_name", "checkout", "submodules", "abs_patch_path", "patch", "contained_files", "clone_options" ]
+}

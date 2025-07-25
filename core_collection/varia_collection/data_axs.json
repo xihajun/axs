@@ -1,0 +1,19 @@
+{
+    "_parent_entries": [ [ "^", "core_collection" ] ],
+    "tags": [
+        "collection"
+    ],
+    "contained_entries": {
+        "base_map": "base_map",
+        "derived_map": "derived_map",
+        "base_for_editing": "base_for_editing",
+        "child_for_editing": "child_for_editing",
+        "be_like": "be_like",
+        "dont_be_like": "dont_be_like",
+        "numpy_import_test": "numpy_import_test",
+        "sysinfo": "sysinfo",
+        "rule_matching_demonstrator": "rule_matching_demonstrator",
+        "rule_matching_producer": "rule_matching_producer",
+        "rule_matching_advertiser": "rule_matching_advertiser"
+    }
+}

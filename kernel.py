@@ -10,11 +10,14 @@ else:
     from kernel import default as ak
 """
 
-__version__ = '0.2.227'     # TODO: update with every kernel change
+__version__ = '0.2.439'     # TODO: update with every kernel change
 
 import logging
 import os
 import sys
+
+import ufun
+
 from runnable import Runnable
 from stored_entry import Entry
 
@@ -95,7 +98,21 @@ Usage examples :
 
         if own_data is None:    # sic: retain the same empty dictionary if given
             own_data = {}
-        return Entry(entry_path=entry_path, own_data=own_data, own_functions=False, container=container, name=name, generated_name_prefix=generated_name_prefix, kernel=self)
+        return Entry(entry_path=entry_path, own_data=own_data, own_functions=False, container=container, name=name, generated_name_prefix=generated_name_prefix, is_stored=False, kernel=self)
+
+
+    def uncache(self, old_path):
+        if old_path and old_path in self.entry_cache:
+            del self.entry_cache[ old_path ]
+            logging.debug(f"[{self.get_name()}] Uncaching from under {old_path}")
+
+
+    def encache(self, new_path, entry):
+        new_path = os.path.realpath( new_path )
+        self.entry_cache[ new_path ] = entry
+        logging.debug(f"[{self.get_name()}] Caching under {new_path}")
+
+        return entry
 
 
     def bypath(self, path, name=None, container=None, own_data=None, parent_objects=None):
@@ -117,28 +134,19 @@ Usage examples :
             logging.debug(f"[{self.get_name()}] bypath: cache HIT for path={path}")
         else:
             logging.debug(f"[{self.get_name()}] bypath: cache MISS for path={path}")
+
             if path.endswith('.json'):      # ad-hoc data entry from a .json file
-                cache_hit = self.entry_cache[path] = Entry(name=name, parameters_path=path, own_functions=False, parent_objects=parent_objects or [], kernel=self)
+                entry_object = Entry(name=name, parameters_path=path, own_functions=False, parent_objects=parent_objects or [], is_stored=True, kernel=self)
             elif path.endswith('.py'):      # ad-hoc functions entry from a .py file
                 module_name = path[:-len('.py')]
-                cache_hit = self.entry_cache[path] = Entry(name=name, entry_path=path, own_data={}, module_name=module_name, parent_objects=parent_objects or [], kernel=self)
+                entry_object = Entry(name=name, entry_path=path, own_data={}, module_name=module_name, parent_objects=parent_objects or [], is_stored=True, kernel=self)
             else:
-                cache_hit = self.entry_cache[path] = Entry(name=name, entry_path=path, own_data=own_data, container=container, parent_objects=parent_objects or None, kernel=self)
+                entry_object = Entry(name=name, entry_path=path, own_data=own_data, container=container, parent_objects=parent_objects or None, kernel=self)
+
+            cache_hit = self.encache( path, entry_object )
             logging.debug(f"[{self.get_name()}] bypath: successfully CACHED {cache_hit.get_name()} under path={path}")
 
         return cache_hit
-
-
-    def cache_replace(self, old_path, new_path, entry):
-        """Invalidate the entry under the old_path and cache the one under the new_path
-        """
-        if old_path and old_path in self.entry_cache:
-            del self.entry_cache[ old_path ]
-            logging.debug(f"[{self.get_name()}] Uncaching from under {old_path}")
-
-        new_path = os.path.realpath( new_path )
-        self.entry_cache[ new_path ] = self
-        logging.debug(f"[{self.get_name()}] Caching under {new_path}")
 
 
     def core_collection(self):
@@ -172,41 +180,59 @@ Usage examples :
             logging.warning(f"[{self.get_name()}] Creating new empty work_collection at {work_collection_path}...")
             work_collection_data = {
                 self.PARAMNAME_parent_entries: [[ "^", "core_collection" ]],
-                "tags": [ "collection" ]
+                "tags": [ "collection" ],
+                "contained_entries": {
+                    "core_collection": [ "^", "execute", [[
+                        [ "core_collection" ],
+                        [ "get_path" ]
+                    ]] ]
+                }
             }
             work_collection_object = self.bypath(work_collection_path, name="work_collection", own_data=work_collection_data)
-            work_collection_object.call('add_entry_path', [ self.kernel_path( 'core_collection' ) ] )
+            work_collection_object.save( completed=ufun.generate_current_timestamp() )
 
         self.record_container( work_collection_object )     # to avoid infinite recursion
         return work_collection_object
 
 
-    def byname(self, entry_name):
+    def byname(self, entry_name, skip_entry_names=None):
         """Fetch an entry by its name (delegated to work_collection)
 
 Usage examples :
                 axs byname pip , help
         """
-        logging.debug(f"[{self.get_name()}] byname({entry_name})")
-        return self.work_collection().call('byname', [entry_name])
+        logging.debug(f"[{self.get_name()}] byname({entry_name, skip_entry_names})")
+        return self.work_collection().call('byname', [entry_name, skip_entry_names])
 
 
-    def all_byquery(self, query, template=None, parent_recursion=False):
+    def all_byquery(self, query, pipeline=None, template=None, parent_recursion=False, skip_entry_names=None):
         """Returns a list of ALL entries matching the query.
             Empty list if nothing matched.
 
 Usage examples :
                 axs all_byquery onnx_model
                 axs all_byquery python_package,package_name=pillow
-                axs all_byquery onnx_model "#{model_name}# : #{file_name}#"
-                axs all_byquery python_package "Python package #{package_name}# version #{package_version}#"
-                axs all_byquery tags. "tags=#{tags}#"
+                axs all_byquery onnx_model --template="#{model_name}# : #{file_name}#"
+                axs all_byquery python_package --template="python_#{python_version}# package #{package_name}#"
+                axs all_byquery tags. --template="tags=#{tags}#"
+                axs all_byquery deleteme+ ---='[["remove"]]'
+                axs all_byquery git_repo ---='[["pull"]]'
         """
-        logging.debug(f"[{self.get_name()}] all_byquery({query}, {template})")
-        return self.work_collection().call('all_byquery', [query, template, parent_recursion])
+        logging.debug(f"[{self.get_name()}] all_byquery({query}, {pipeline}, {template}, {parent_recursion}, {skip_entry_names})")
+        return self.work_collection().call('all_byquery', [query, pipeline, template, parent_recursion, skip_entry_names])
 
 
-    def byquery(self, query, produce_if_not_found=True, parent_recursion=False):
+    def show_matching_rules(self, query):
+        """Find and show all the rules (and their advertising entries) that match the given query.
+
+Usage examples :
+                axs show_matching_rules shell_tool,can_download_url_from_zenodo
+        """
+        logging.debug(f"[{self.get_name()}] show_matching_rules({query})")
+        return self.work_collection().call('show_matching_rules', [query])
+
+
+    def byquery(self, query, produce_if_not_found=True, parent_recursion=False, skip_entry_names=None):
         """Fetch an entry by a query over its tags (delegated to work_collection)
             Note parent_recursion is False by default, but can be switched on manually (beware of the avalanche though!).
 
@@ -214,8 +240,8 @@ Usage examples :
                 axs byquery person.,be!=Be
                 axs byquery person.,be!=Be --parent_recursion+ , get_path
         """
-        logging.debug(f"[{self.get_name()}] byquery({query})")
-        return self.work_collection().call('byquery', [query, produce_if_not_found, parent_recursion])
+        logging.debug(f"[{self.get_name()}] byquery({query}, {produce_if_not_found}, {parent_recursion}, {skip_entry_names})")
+        return self.work_collection().call('byquery', [query, produce_if_not_found, parent_recursion, skip_entry_names])
 
 
 #logging.basicConfig(level=logging.DEBUG, format="%(levelname)s:%(funcName)s %(message)s")

@@ -1,0 +1,27 @@
+{
+    "_producer_rules": [
+        [ [ "program_output", "calendar" ], [[ "get", "pipeline" ]] ]
+    ],
+    "_parent_entries": [ [ "^", "byname", "python_script" ], [ "^", "byname", "entry_creator" ] ],
+
+    "python_deps": [ ],
+
+    "year": 2022,
+    "month": 10,
+    "first_weekday": 0,
+
+    "newborn_entry_tags": [ "program_output", "calendar" ],
+    "newborn_parent_names": [ "base_experiment" ],
+    "newborn_name_template": "calendar_#{year}#_#{month}#_#{first_weekday}#",
+    "newborn_entry_param_names": [ "year", "month", "first_weekday" ],
+
+    "pipeline": [ "^^", "execute", [[
+        [ "run" ],
+        [ ],
+        [ "get", "stored_newborn_entry" ]
+    ]] ],
+     
+    "rel_script_path": "generate_calendar.py",
+
+    "script_params_template": "\"#{stored_newborn_entry.input_json_file_path}#\" \"#{stored_newborn_entry.output_json_file_path}#\" "
+}

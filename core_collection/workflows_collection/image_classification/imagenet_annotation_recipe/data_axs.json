@@ -1,0 +1,14 @@
+{
+    "_producer_rules": [
+        [ [ "downloaded", "imagenet_annotation" ], [["get_kernel"],["byname","downloader"],["download"]], {}, [ "url", "md5" ] ],
+        [ [ "extracted",  "imagenet_annotation" ], [["get_kernel"],["byname","extractor" ],["extract"]],  {}, [ "archive_path" ] ]
+    ],
+
+    "url": "http://dl.caffe.berkeleyvision.org/caffe_ilsvrc12.tar.gz",
+    "md5": "f963098ea0e785a968ca1eb634003a90",
+
+    "archive_path": [ "^", "execute", [[
+        [ "byquery", [[ "^^", "substitute", "downloaded,imagenet_annotation,url=#{url}#,md5=#{md5}#" ]] ],
+        [ "get_path" ]
+    ]], {}, ["url","md5"] ]
+}

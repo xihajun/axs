@@ -1,0 +1,26 @@
+{
+    "_producer_rules": [
+        [ [ "downloaded", "onnx_model", "model_name=ssd_resnet34" ], [["get_kernel"],["byname","downloader"],["download"]], {
+            "url": "https://zenodo.org/record/3228411/files/resnet34-ssd1200.onnx",
+            "md5": "b70fc6c72bc9349981f3b1258f31bc87",
+
+            "retrained": false,
+            "input_data_types": "fp32",
+            "weight_data_types": "fp32",
+            "weight_transformations": "PyTorch -> ONNX",
+
+            "dataset_name": "coco",
+            "resolution": 1200,
+            "output_scale": 1,
+
+            "input_layer_name": "image",
+            "output_layers_bls": "['bboxes', 'labels', 'scores']",
+            "skipped_classes": "[12,26,29,30,45,66,68,69,71,83]",
+
+            "normalize_symmetric": "False",
+            "subtract_mean_bool": "True",
+            "given_channel_means": "[0.485, 0.456, 0.406]",
+            "given_channel_stds": "[0.229, 0.224, 0.225]"
+        } ]
+    ]
+}

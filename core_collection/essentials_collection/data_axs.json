@@ -1,0 +1,29 @@
+{
+    "_parent_entries": [ [ "^", "core_collection" ] ],
+    "tags": [
+        "collection"
+    ],
+    "contained_entries": {
+        "entry_creator": "entry_creator",
+
+        "downloader": "downloader",
+        "extractor": "extractor",
+        "git": "git",
+
+        "python_user": "python_user",
+
+        "pip": "pip",
+        "base_build_python_wheel": "base_build_python_wheel",
+        "base_pip_package": "base_pip_package",
+
+        "shell": "shell",
+        "python_in_shell": "python_in_shell",
+        "python_script": "python_script",
+        "base_experiment": "base_experiment",
+
+        "tool_detector": "tool_detector",
+
+        "make_collection": "make_collection",
+        "rclone_recipe": "rclone_recipe"
+    }
+}

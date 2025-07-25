@@ -1,0 +1,74 @@
+{
+    "_parent_entries": [ [ "^", "byname", "base_benchmark_program" ] ],
+    "_producer_rules": [
+        [ [ "program_output", "task=image_classification", "framework=tf" ], [["run"]], { "return_saved_record_entry": true } ]
+    ],
+
+    "tensorflow_query": [ "python_package", "package_name=tensorflow" ],
+    "python_deps": [
+        [ "^^", "python_sync_pip_package", [[ "^^", "get", "tensorflow_query" ]] ],
+        [ "^", "byquery", "data_loader,imagenet" ]
+    ],
+
+    "model_name": "mobilenet_v2",
+    "model_query": [ "inference_ready", "tf_model", [ "^^", "substitute", "model_name=#{model_name}#" ] ],
+    "model_entry": [ "^", "byquery", [[ "^^", "get", "model_query" ]], {}, ["model_query"] ],
+    "model_path": [ "^^", "execute", [[
+        [ "get", "model_entry" ],
+        [ "get_path_from", "model_rel_path" ]
+    ]] ],
+    "dataset_name": [ "^^", "dig", "model_entry.dataset_name" ],
+    "resolution": [ "^^", "dig", "model_entry.resolution" ],
+    "input_layer_name": [ "^^", "dig", "model_entry.input_layer_name" ],
+    "output_layer_name": [ "^^", "dig", "model_entry.output_layer_name" ],
+    "normalization": [ "^^", "dig", "model_entry.normalization" ],
+
+    "preprocess_method": "pillow",
+    "index_file": null,
+    "preprocessed_images_query": [
+        "preprocessed",
+        [ "dataset_name", [ "^^", "get", "dataset_name" ]],
+        [ "preprocess_method", [ "^^", "get", "preprocess_method" ]],
+        [ "resolution", [ "^^", "get", "resolution" ]],
+        [ "first_n", [ "^^", "get", "num_of_images" ]],
+        [ "index_file", [ "^^", "get", "index_file" ]],
+        "normalayout-",
+        "quantized-"
+    ],
+    "preprocessed_images_entry": [ "^", "byquery", [[ "^^", "get", "preprocessed_images_query" ]], {}, ["preprocessed_images_query"] ],
+    "preprocessed_images_dir": [ "^^", "execute", [[
+        [ "get", "preprocessed_images_entry" ],
+        [ "get_path" ]
+    ]] ],
+    "input_file_list": [ "^^", "dig", "preprocessed_images_entry.input_file_list" ],
+
+    "framework": "tf",
+    "num_of_images": 20,
+    "max_batch_size": 25,
+    "top_n_max": 10,
+
+    "gpu_memory_percent": 33,
+    "num_of_cpus": 0,
+
+    "output_entry_parents": [ "AS^IS", "AS^IS", [ "^", "byname", "base_imagenet_experiment" ] ],
+    "output_entry_param_names": [
+        "num_of_images",
+        "max_batch_size",
+        "top_n_max",
+
+        "gpu_memory_percent",
+        "num_of_cpus",
+
+        "model_path",
+        "preprocessed_images_dir",
+        "input_file_list",
+        "resolution",
+        "input_layer_name",
+        "output_layer_name",
+        "normalization"
+    ],
+
+    "errorize_output": true,
+
+    "rel_script_path": "tf_classify.py"
+}
